@@ -266,9 +266,8 @@ static void decode_ford_v0(
 
     *count = ((buf[5] & 0x0F) << 16) | (buf[6] << 8) | buf[7];
 
-    //Build the BS Magic number for this fob.
-    *bs_magic = bs - (*button << 4);
-    *bs_magic -= (uint8_t)(*count & 0xFF);
+    //Build the BS Magic number for this fob. (Wlll have overflow bug until other pr is acceoted and overflow calc returned)
+    *bs_magic = bs - (*button << 4) - (uint8_t)(*count & 0xFF);
 }
 
 // =============================================================================
