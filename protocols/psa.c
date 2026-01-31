@@ -1,4 +1,5 @@
 #include "psa.h"
+#include "../protopirate_app_i.h"
 
 #define TAG "PSAProtocol"
 
@@ -188,11 +189,14 @@ static void psa_build_buffer_mode23(SubGhzProtocolEncoderPSA* instance, uint8_t*
     buffer[8] = (uint8_t)(instance->button & 0xF);
     
     uint8_t original_buffer9 = 0;
-    uint8_t original_buffer8 = 0;
     bool has_original_key2 = (instance->key2_low != 0);
     if(has_original_key2) {
         original_buffer9 = (uint8_t)(instance->key2_low & 0xFF);
-        original_buffer8 = (uint8_t)((instance->key2_low >> 8) & 0xFF);
+#ifndef REMOVE_LOGS
+        uint8_t original_buffer8 = (uint8_t)((instance->key2_low >> 8) & 0xFF);
+        FURI_LOG_D(TAG, "Original Key2: 0x%04X, buffer[8]=0x%02X buffer[9]=0x%02X, preserving buffer[9]",
+            (unsigned int)instance->key2_low, original_buffer8, original_buffer9);
+#endif
         buffer[9] = original_buffer9;
         FURI_LOG_D(TAG, "Original Key2: 0x%04X, buffer[8]=0x%02X buffer[9]=0x%02X, preserving buffer[9]",
             (unsigned int)instance->key2_low, original_buffer8, original_buffer9);
