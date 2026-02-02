@@ -1,5 +1,4 @@
 #include "psa.h"
-#include "../protopirate_app_i.h"
 
 #define TAG "PSAProtocol"
 
@@ -189,14 +188,11 @@ static void psa_build_buffer_mode23(SubGhzProtocolEncoderPSA* instance, uint8_t*
     buffer[8] = (uint8_t)(instance->button & 0xF);
     
     uint8_t original_buffer9 = 0;
+    uint8_t original_buffer8 = 0;
     bool has_original_key2 = (instance->key2_low != 0);
     if(has_original_key2) {
         original_buffer9 = (uint8_t)(instance->key2_low & 0xFF);
-#ifndef REMOVE_LOGS
-        uint8_t original_buffer8 = (uint8_t)((instance->key2_low >> 8) & 0xFF);
-        FURI_LOG_D(TAG, "Original Key2: 0x%04X, buffer[8]=0x%02X buffer[9]=0x%02X, preserving buffer[9]",
-            (unsigned int)instance->key2_low, original_buffer8, original_buffer9);
-#endif
+        original_buffer8 = (uint8_t)((instance->key2_low >> 8) & 0xFF);
         buffer[9] = original_buffer9;
         FURI_LOG_D(TAG, "Original Key2: 0x%04X, buffer[8]=0x%02X buffer[9]=0x%02X, preserving buffer[9]",
             (unsigned int)instance->key2_low, original_buffer8, original_buffer9);
@@ -1042,11 +1038,13 @@ void subghz_protocol_decoder_psa_feed(void* context, bool level, uint32_t durati
                 } else {
                     tolerance = duration - PSA_TE_SHORT_125;
                 }
-                if(tolerance > PSA_TOLERANCE_49) {
+                if(tolerance > 40) {
+                    return;
+                }
+                if(duration > 180) {
                     return;
                 }
                 new_state = PSADecoderState3;
-                FURI_LOG_I(TAG, "[State0->State3] Detected te=125 pattern (Type 0x23)");
             } else {
                 new_state = PSADecoderState1;
             }
@@ -1108,8 +1106,8 @@ void subghz_protocol_decoder_psa_feed(void* context, bool level, uint32_t durati
                 }
                 if(long_diff < 100) {
                     if(instance->pattern_counter > PSA_PATTERN_THRESHOLD_1) {
-                        FURI_LOG_I(TAG, "[State1->State2] Transition detected with pattern_cnt=%lu > %d", 
-                                  (unsigned long)instance->pattern_counter, PSA_PATTERN_THRESHOLD_1);
+                        FURI_LOG_I(TAG, "[State1->State2] Transition detected with pattern_cnt=%lu", 
+                                  (unsigned long)instance->pattern_counter);
                         new_state = PSADecoderState2;
                         instance->decode_data_low = 0;
                         instance->decode_data_high = 0;
@@ -1117,11 +1115,6 @@ void subghz_protocol_decoder_psa_feed(void* context, bool level, uint32_t durati
                         manchester_advance(instance->manchester_state, ManchesterEventReset, 
                                          &instance->manchester_state, NULL);
                         instance->state = new_state;
-                    } else {
-                        FURI_LOG_D(TAG, "[State1] LONG(%lu) seen but pattern_cnt=%lu <= %d", 
-                                  (unsigned long)duration,
-                                  (unsigned long)instance->pattern_counter, 
-                                  PSA_PATTERN_THRESHOLD_1);
                     }
                     instance->pattern_counter = 0;
                     instance->prev_duration = duration;
@@ -1149,7 +1142,17 @@ void subghz_protocol_decoder_psa_feed(void* context, bool level, uint32_t durati
                     end_diff = duration - PSA_TE_END_1000;
                 }
                 if(end_diff <= 199) {
+                    if(((instance->key1_high >> 16) & 0xF) != 0xA) {
+                        instance->decode_data_low = 0;
+                        instance->decode_data_high = 0;
+                        instance->decode_count_bit = 0;
+                        new_state = PSADecoderState0;
+                        instance->state = new_state;
+                        return;
+                    }
+                    
                     uint32_t new_key2_low = instance->decode_data_low;
+                    instance->validation_field = (uint16_t)(instance->decode_data_low & 0xFFFF);
                     
                     instance->decrypted_type = 0;
                     instance->decrypted_button = 0;
@@ -1159,7 +1162,6 @@ void subghz_protocol_decoder_psa_feed(void* context, bool level, uint32_t durati
                     instance->decrypted_seed = 0;
                     instance->decrypted = 0x00;
                     
-                    instance->validation_field = (uint16_t)(instance->decode_data_low & 0xFFFF);
                     instance->key2_low = new_key2_low;
                     instance->key2_high = instance->decode_data_high;
                     instance->mode_serialize = 1;
@@ -1302,10 +1304,9 @@ void subghz_protocol_decoder_psa_feed(void* context, bool level, uint32_t durati
                     return;
                 }
                 
-                instance->validation_field = (uint16_t)(instance->decode_data_low & 0xFFFF);
-                
-                if((instance->validation_field & 0xf) == 0xa) {
+                if(((instance->key1_high >> 16) & 0xF) == 0xA) {
                     uint32_t new_key2_low = instance->decode_data_low;
+                    instance->validation_field = (uint16_t)(instance->decode_data_low & 0xFFFF);
                     
                     instance->decrypted_type = 0;
                     instance->decrypted_button = 0;
@@ -1354,27 +1355,26 @@ void subghz_protocol_decoder_psa_feed(void* context, bool level, uint32_t durati
         break;
         
     case PSADecoderState3:
-        if(duration >= PSA_TE_LONG_250 && duration < 0x12c) {
-            if(instance->pattern_counter > PSA_PATTERN_THRESHOLD_2) {
-                FURI_LOG_I(TAG, "[State3->State4] Transition detected with pattern_cnt=%lu > %d", 
-                          (unsigned long)instance->pattern_counter, PSA_PATTERN_THRESHOLD_2);
-                new_state = PSADecoderState4;
-                instance->decode_data_low = 0;
-                instance->decode_data_high = 0;
-                instance->decode_count_bit = 0;
-                manchester_advance(instance->manchester_state, ManchesterEventReset, 
-                                 &instance->manchester_state, NULL);
-                instance->state = new_state;
-            } else {
-                FURI_LOG_W(TAG, "[State3] %s(%lu) seen but pattern_cnt=%lu <= %d", 
-                          level ? "HIGH" : "LOW", 
-                          (unsigned long)duration,
-                          (unsigned long)instance->pattern_counter, 
-                          PSA_PATTERN_THRESHOLD_2);
+        if(duration >= 250) {
+            if(duration >= PSA_TE_LONG_250 && duration < 0x12c) {
+                if(instance->pattern_counter > PSA_PATTERN_THRESHOLD_2) {
+                    FURI_LOG_I(TAG, "[State3->State4] Transition detected with pattern_cnt=%lu", 
+                              (unsigned long)instance->pattern_counter);
+                    new_state = PSADecoderState4;
+                    instance->decode_data_low = 0;
+                    instance->decode_data_high = 0;
+                    instance->decode_count_bit = 0;
+                    manchester_advance(instance->manchester_state, ManchesterEventReset, 
+                                     &instance->manchester_state, NULL);
+                    instance->state = new_state;
+                    instance->pattern_counter = 0;
+                    instance->prev_duration = duration;
+                    return;
+                }
             }
+            new_state = PSADecoderState0;
             instance->pattern_counter = 0;
-            instance->prev_duration = duration;
-            return;
+            break;
         }
         
         if(duration < PSA_TE_SHORT_125) {
@@ -1387,42 +1387,15 @@ void subghz_protocol_decoder_psa_feed(void* context, bool level, uint32_t durati
             uint32_t prev_diff = psa_abs_diff(prev_dur, PSA_TE_SHORT_125);
             if(prev_diff <= PSA_TOLERANCE_49) {
                 instance->pattern_counter++;
-                FURI_LOG_D(TAG, "[State3] %s(%lu) pattern_cnt=%lu (prev_diff=%lu)", 
-                          level ? "HIGH" : "LOW", 
-                          (unsigned long)duration,
-                          (unsigned long)instance->pattern_counter,
-                          (unsigned long)prev_diff);
             } else {
-                if(instance->pattern_counter < 10) {
-                    FURI_LOG_D(TAG, "[State3] %s(%lu) reset pattern_cnt (prev_diff=%lu > %d, cnt=%lu)", 
-                              level ? "HIGH" : "LOW", 
-                              (unsigned long)duration,
-                              (unsigned long)prev_diff,
-                              PSA_TOLERANCE_49,
-                              (unsigned long)instance->pattern_counter);
-                    instance->pattern_counter = 0;
-                } else {
-                    FURI_LOG_D(TAG, "[State3] %s(%lu) pattern_cnt kept at %lu (prev_diff=%lu, slight variation)", 
-                              level ? "HIGH" : "LOW", 
-                              (unsigned long)duration,
-                              (unsigned long)instance->pattern_counter,
-                              (unsigned long)prev_diff);
-                }
+                instance->pattern_counter = 0;
             }
             instance->prev_duration = duration;
             return;
         }
         
-        if(duration > 500) {
-            new_state = PSADecoderState0;
-        } else {
-            FURI_LOG_D(TAG, "[State3] %s(%lu) ignored (tolerance=%lu >= %d), staying in State3", 
-                      level ? "HIGH" : "LOW", 
-                      (unsigned long)duration,
-                      (unsigned long)tolerance,
-                      PSA_TOLERANCE_50);
-            return;
-        }
+        new_state = PSADecoderState0;
+        instance->pattern_counter = 0;
         break;
         
     case PSADecoderState4:
@@ -1484,7 +1457,17 @@ void subghz_protocol_decoder_psa_feed(void* context, bool level, uint32_t durati
                     return;
                 }
                 
+                if(((instance->key1_high >> 16) & 0xF) != 0xA) {
+                    instance->decode_data_low = 0;
+                    instance->decode_data_high = 0;
+                    instance->decode_count_bit = 0;
+                    new_state = PSADecoderState0;
+                    instance->state = new_state;
+                    return;
+                }
+                
                 uint32_t new_key2_low = instance->decode_data_low;
+                instance->validation_field = (uint16_t)(instance->decode_data_low & 0xFFFF);
                 
                 instance->decrypted_type = 0;
                 instance->decrypted_button = 0;
@@ -1494,7 +1477,6 @@ void subghz_protocol_decoder_psa_feed(void* context, bool level, uint32_t durati
                 instance->decrypted_seed = 0;
                 instance->decrypted = 0x00;
                 
-                instance->validation_field = (uint16_t)(instance->decode_data_low & 0xFFFF);
                 instance->key2_low = new_key2_low;
                 instance->key2_high = instance->decode_data_high;
                 instance->mode_serialize = 2;
@@ -1766,5 +1748,3 @@ void subghz_protocol_decoder_psa_get_string(void* context, FuriString* output) {
             key2_value);
     }
 }
-
-
