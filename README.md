@@ -96,4 +96,4 @@ Join **The Pirates' Plunder** on Discord for development updates, testing, proto
 
 ➡️ **[https://discord.gg/thepirates](https://discord.gg/thepirates)**
 
-<img width="1500" height="1000" alt="rocketgod_logo_transparent" src="https://github.com/user-attachments/assets/ad15b106-152c-4a60-a9e2-4d40dfa8f3c6" />
+<img alt="rocketgod_logo_transparent" src="https://github.com/user-attachments/assets/ad15b106-152c-4a60-a9e2-4d40dfa8f3c6" />
