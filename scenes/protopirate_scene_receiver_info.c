@@ -4,6 +4,8 @@
 
 #define TAG "ProtoPirateReceiverInfo"
 
+static bool is_emu_off = false;
+
 static void protopirate_scene_receiver_info_widget_callback(
     GuiButtonType result,
     InputType type,
@@ -49,6 +51,17 @@ void protopirate_scene_receiver_info_on_enter(void* context) {
         if(flipper_format_read_string(ff, "Protocol", protocol)) {
             if(furi_string_cmp_str(protocol, "PSA") == 0) {
                 is_psa = true;
+            }
+            if(furi_string_cmp_str(protocol, "VAG") == 0) {
+                is_emu_off = true;
+            } else if(furi_string_cmp_str(protocol, "Scher-Khan") == 0) {
+                is_emu_off = true;
+            } else if(furi_string_cmp_str(protocol, "Kia V5") == 0) {
+                is_emu_off = true;
+            } else if(furi_string_cmp_str(protocol, "Kia V6") == 0) {
+                is_emu_off = true;
+            } else {
+                is_emu_off = false;
             }
         }
         furi_string_free(protocol);
@@ -140,12 +153,14 @@ void protopirate_scene_receiver_info_on_enter(void* context) {
 
 #ifdef ENABLE_EMULATE_FEATURE
     // Add emulate button on the left
-    widget_add_button_element(
-        app->widget,
-        GuiButtonTypeLeft,
-        "Emulate",
-        protopirate_scene_receiver_info_widget_callback,
-        app);
+    if(!is_emu_off) {
+        widget_add_button_element(
+            app->widget,
+            GuiButtonTypeLeft,
+            "Emulate",
+            protopirate_scene_receiver_info_widget_callback,
+            app);
+    }
 #endif
 
     // Add save button on the right
@@ -196,7 +211,7 @@ bool protopirate_scene_receiver_info_on_event(void* context, SceneManagerEvent e
             consumed = true;
         }
 #ifdef ENABLE_EMULATE_FEATURE
-        else if(event.event == ProtoPirateCustomEventReceiverInfoEmulate) {
+        else if(event.event == ProtoPirateCustomEventReceiverInfoEmulate && !is_emu_off) {
             // Get the flipper format from history
             FlipperFormat* ff =
                 protopirate_history_get_raw_data(app->txrx->history, app->txrx->idx_menu_chosen);
