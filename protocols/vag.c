@@ -60,19 +60,21 @@ static struct aut64_key* protocol_vag_get_key(uint8_t index) {
     return NULL;
 }
 
-#define VAG_TEA_DELTA      0x9E3779B9U
-#define VAG_TEA_ROUNDS     32
+#define VAG_TEA_DELTA  0x9E3779B9U
+#define VAG_TEA_ROUNDS 32
 
-static const uint32_t vag_tea_key_schedule[] = {
-    0x0B46502D, 0x5E253718, 0x2BF93A19, 0x622C1206
-};
+static const uint32_t vag_tea_key_schedule[] = {0x0B46502D, 0x5E253718, 0x2BF93A19, 0x622C1206};
 
 static const char* vag_button_name(uint8_t btn) {
     switch(btn) {
-    case 1: return "Unlock";
-    case 2: return "Lock";
-    case 4: return "Trunk";
-    default: return "Unknown";
+    case 1:
+        return "Unlock";
+    case 2:
+        return "Lock";
+    case 4:
+        return "Trunk";
+    default:
+        return "Unknown";
     }
 }
 
@@ -134,7 +136,7 @@ static bool vag_dispatch_type_3_4(uint8_t dispatch) {
 static bool vag_button_valid(const uint8_t* dec) {
     uint8_t dec_byte = dec[7];
     uint8_t dec_btn = (dec_byte >> 4) & 0xF;
-    
+
     if(dec_btn == 1 || dec_btn == 2 || dec_btn == 4) {
         return true;
     }
@@ -147,7 +149,7 @@ static bool vag_button_valid(const uint8_t* dec) {
 static bool vag_button_matches(const uint8_t* dec, uint8_t dispatch_byte) {
     uint8_t expected_btn = (dispatch_byte >> 4) & 0xF;
     uint8_t dec_btn = (dec[7] >> 4) & 0xF;
-    
+
     if(dec_btn == expected_btn) {
         return true;
     }
@@ -161,13 +163,13 @@ static void vag_fill_from_decrypted(
     SubGhzProtocolDecoderVAG* instance,
     const uint8_t* dec,
     uint8_t dispatch_byte) {
-    uint32_t serial_raw = (uint32_t)dec[0] | ((uint32_t)dec[1] << 8) |
-                          ((uint32_t)dec[2] << 16) | ((uint32_t)dec[3] << 24);
+    uint32_t serial_raw = (uint32_t)dec[0] | ((uint32_t)dec[1] << 8) | ((uint32_t)dec[2] << 16) |
+                          ((uint32_t)dec[3] << 24);
     instance->serial = (serial_raw << 24) | ((serial_raw & 0xFF00) << 8) |
                        ((serial_raw >> 8) & 0xFF00) | (serial_raw >> 24);
-    
+
     instance->cnt = (uint32_t)dec[4] | ((uint32_t)dec[5] << 8) | ((uint32_t)dec[6] << 16);
-    
+
     instance->btn = (dec[7] >> 4) & 0xF;
     instance->check_byte = dispatch_byte;
     instance->decrypted = true;
@@ -185,22 +187,26 @@ static bool vag_aut64_decrypt(uint8_t* block, int key_index) {
 
 static void vag_parse_data(SubGhzProtocolDecoderVAG* instance) {
     furi_assert(instance);
-    
+
     instance->decrypted = false;
     instance->serial = 0;
     instance->cnt = 0;
     instance->btn = 0;
-    
+
     uint8_t dispatch_byte = (uint8_t)(instance->key2_low & 0xFF);
     uint8_t key2_high = (uint8_t)((instance->key2_low >> 8) & 0xFF);
-    
-    FURI_LOG_I(TAG, "Parsing VAG type=%d dispatch=0x%02X expected_btn=%d",
-               instance->vag_type, dispatch_byte, (dispatch_byte >> 4) & 0xF);
-    
+
+    FURI_LOG_I(
+        TAG,
+        "Parsing VAG type=%d dispatch=0x%02X expected_btn=%d",
+        instance->vag_type,
+        dispatch_byte,
+        (dispatch_byte >> 4) & 0xF);
+
     uint8_t key1_bytes[8];
     uint32_t key1_low = instance->key1_low;
     uint32_t key1_high = instance->key1_high;
-    
+
     key1_bytes[0] = (uint8_t)(key1_high >> 24);
     key1_bytes[1] = (uint8_t)(key1_high >> 16);
     key1_bytes[2] = (uint8_t)(key1_high >> 8);
@@ -209,9 +215,9 @@ static void vag_parse_data(SubGhzProtocolDecoderVAG* instance) {
     key1_bytes[5] = (uint8_t)(key1_low >> 16);
     key1_bytes[6] = (uint8_t)(key1_low >> 8);
     key1_bytes[7] = (uint8_t)(key1_low);
-    
+
     uint8_t type_byte = key1_bytes[0];
-    
+
     uint8_t block[8];
     block[0] = key1_bytes[1];
     block[1] = key1_bytes[2];
@@ -221,13 +227,21 @@ static void vag_parse_data(SubGhzProtocolDecoderVAG* instance) {
     block[5] = key1_bytes[6];
     block[6] = key1_bytes[7];
     block[7] = key2_high;
-    
-    FURI_LOG_D(TAG, "Type byte: 0x%02X, Encrypted block: %02X %02X %02X %02X %02X %02X %02X %02X",
-               type_byte, block[0], block[1], block[2], block[3], 
-               block[4], block[5], block[6], block[7]);
-    
+
+    FURI_LOG_D(
+        TAG,
+        "Type byte: 0x%02X, Encrypted block: %02X %02X %02X %02X %02X %02X %02X %02X",
+        type_byte,
+        block[0],
+        block[1],
+        block[2],
+        block[3],
+        block[4],
+        block[5],
+        block[6],
+        block[7]);
+
     switch(instance->vag_type) {
-    
     case 1:
         if(!vag_dispatch_type_1_2(dispatch_byte)) {
             FURI_LOG_W(TAG, "Type 1: dispatch mismatch 0x%02X", dispatch_byte);
@@ -235,35 +249,40 @@ static void vag_parse_data(SubGhzProtocolDecoderVAG* instance) {
         }
         {
             uint8_t block_copy[8];
-            
+
             for(int key_idx = 0; key_idx < 3; key_idx++) {
                 memcpy(block_copy, block, 8);
                 if(!vag_aut64_decrypt(block_copy, key_idx)) {
                     continue;
                 }
-                
+
                 if(vag_button_valid(block_copy)) {
-                    instance->serial = ((uint32_t)block_copy[0] << 24) | 
+                    instance->serial = ((uint32_t)block_copy[0] << 24) |
                                        ((uint32_t)block_copy[1] << 16) |
-                                       ((uint32_t)block_copy[2] << 8) | 
-                                       (uint32_t)block_copy[3];
-                    instance->cnt = (uint32_t)block_copy[4] | 
-                                    ((uint32_t)block_copy[5] << 8) | 
+                                       ((uint32_t)block_copy[2] << 8) | (uint32_t)block_copy[3];
+                    instance->cnt = (uint32_t)block_copy[4] | ((uint32_t)block_copy[5] << 8) |
                                     ((uint32_t)block_copy[6] << 16);
                     instance->btn = block_copy[7];
                     instance->check_byte = dispatch_byte;
                     instance->decrypted = true;
-                    FURI_LOG_I(TAG, "Type 1 key%d decoded: Ser=%08lX Cnt=%06lX Btn=%02X",
-                               key_idx, (unsigned long)instance->serial, 
-                               (unsigned long)instance->cnt, instance->btn);
+                    FURI_LOG_I(
+                        TAG,
+                        "Type 1 key%d decoded: Ser=%08lX Cnt=%06lX Btn=%02X",
+                        key_idx,
+                        (unsigned long)instance->serial,
+                        (unsigned long)instance->cnt,
+                        instance->btn);
                     return;
                 }
             }
-            FURI_LOG_W(TAG, "Type 1: all keys failed, dec[7]=0x%02X dispatch=0x%02X", 
-                       block_copy[7], dispatch_byte);
+            FURI_LOG_W(
+                TAG,
+                "Type 1: all keys failed, dec[7]=0x%02X dispatch=0x%02X",
+                block_copy[7],
+                dispatch_byte);
         }
         break;
-    
+
     case 2:
         if(!vag_dispatch_type_1_2(dispatch_byte)) {
             FURI_LOG_W(TAG, "Type 2: dispatch mismatch 0x%02X", dispatch_byte);
@@ -274,13 +293,13 @@ static void vag_parse_data(SubGhzProtocolDecoderVAG* instance) {
                                ((uint32_t)block[2] << 8) | (uint32_t)block[3];
             uint32_t v1_orig = ((uint32_t)block[4] << 24) | ((uint32_t)block[5] << 16) |
                                ((uint32_t)block[6] << 8) | (uint32_t)block[7];
-            
+
             {
                 uint32_t v0 = v0_orig;
                 uint32_t v1 = v1_orig;
-                
+
                 vag_tea_decrypt(&v0, &v1, vag_tea_key_schedule);
-                
+
                 uint8_t tea_dec[8];
                 tea_dec[0] = (uint8_t)(v0 >> 24);
                 tea_dec[1] = (uint8_t)(v0 >> 16);
@@ -290,56 +309,76 @@ static void vag_parse_data(SubGhzProtocolDecoderVAG* instance) {
                 tea_dec[5] = (uint8_t)(v1 >> 16);
                 tea_dec[6] = (uint8_t)(v1 >> 8);
                 tea_dec[7] = (uint8_t)(v1);
-                
+
                 if(!vag_button_matches(tea_dec, dispatch_byte)) {
-                    FURI_LOG_W(TAG, "Type 2: XTEA button mismatch dec[7]=0x%02X dispatch=0x%02X",
-                               tea_dec[7], dispatch_byte);
+                    FURI_LOG_W(
+                        TAG,
+                        "Type 2: XTEA button mismatch dec[7]=0x%02X dispatch=0x%02X",
+                        tea_dec[7],
+                        dispatch_byte);
                     break;
                 }
-                
+
                 vag_fill_from_decrypted(instance, tea_dec, dispatch_byte);
-                
-                FURI_LOG_I(TAG, "Type 2 XTEA decoded: Ser=%08lX Cnt=%06lX Btn=%d",
-                           (unsigned long)instance->serial, 
-                           (unsigned long)instance->cnt, instance->btn);
+
+                FURI_LOG_I(
+                    TAG,
+                    "Type 2 XTEA decoded: Ser=%08lX Cnt=%06lX Btn=%d",
+                    (unsigned long)instance->serial,
+                    (unsigned long)instance->cnt,
+                    instance->btn);
                 return;
             }
         }
         break;
-    
-    case 3:
-        {
-            uint8_t block_copy[8];
-            
-            memcpy(block_copy, block, 8);
-            if(vag_aut64_decrypt(block_copy, 2) && vag_button_valid(block_copy)) {
-                instance->vag_type = 4;
-                vag_fill_from_decrypted(instance, block_copy, dispatch_byte);
-                FURI_LOG_I(TAG, "Type 3->4 key2 decoded: Ser=%08lX Cnt=%06lX Btn=%d",
-                           (unsigned long)instance->serial, (unsigned long)instance->cnt, instance->btn);
-                return;
-            }
-            
-            memcpy(block_copy, block, 8);
-            if(vag_aut64_decrypt(block_copy, 1) && vag_button_valid(block_copy)) {
-                vag_fill_from_decrypted(instance, block_copy, dispatch_byte);
-                FURI_LOG_I(TAG, "Type 3 key1 decoded: Ser=%08lX Cnt=%06lX Btn=%d",
-                           (unsigned long)instance->serial, (unsigned long)instance->cnt, instance->btn);
-                return;
-            }
-            
-            memcpy(block_copy, block, 8);
-            if(vag_aut64_decrypt(block_copy, 0) && vag_button_valid(block_copy)) {
-                vag_fill_from_decrypted(instance, block_copy, dispatch_byte);
-                FURI_LOG_I(TAG, "Type 3 key0 decoded: Ser=%08lX Cnt=%06lX Btn=%d",
-                           (unsigned long)instance->serial, (unsigned long)instance->cnt, instance->btn);
-                return;
-            }
-            
-            FURI_LOG_W(TAG, "Type 3: all keys failed, dec[7]=0x%02X dispatch=0x%02X", block_copy[7], dispatch_byte);
+
+    case 3: {
+        uint8_t block_copy[8];
+
+        memcpy(block_copy, block, 8);
+        if(vag_aut64_decrypt(block_copy, 2) && vag_button_valid(block_copy)) {
+            instance->vag_type = 4;
+            vag_fill_from_decrypted(instance, block_copy, dispatch_byte);
+            FURI_LOG_I(
+                TAG,
+                "Type 3->4 key2 decoded: Ser=%08lX Cnt=%06lX Btn=%d",
+                (unsigned long)instance->serial,
+                (unsigned long)instance->cnt,
+                instance->btn);
+            return;
         }
-        break;
-    
+
+        memcpy(block_copy, block, 8);
+        if(vag_aut64_decrypt(block_copy, 1) && vag_button_valid(block_copy)) {
+            vag_fill_from_decrypted(instance, block_copy, dispatch_byte);
+            FURI_LOG_I(
+                TAG,
+                "Type 3 key1 decoded: Ser=%08lX Cnt=%06lX Btn=%d",
+                (unsigned long)instance->serial,
+                (unsigned long)instance->cnt,
+                instance->btn);
+            return;
+        }
+
+        memcpy(block_copy, block, 8);
+        if(vag_aut64_decrypt(block_copy, 0) && vag_button_valid(block_copy)) {
+            vag_fill_from_decrypted(instance, block_copy, dispatch_byte);
+            FURI_LOG_I(
+                TAG,
+                "Type 3 key0 decoded: Ser=%08lX Cnt=%06lX Btn=%d",
+                (unsigned long)instance->serial,
+                (unsigned long)instance->cnt,
+                instance->btn);
+            return;
+        }
+
+        FURI_LOG_W(
+            TAG,
+            "Type 3: all keys failed, dec[7]=0x%02X dispatch=0x%02X",
+            block_copy[7],
+            dispatch_byte);
+    } break;
+
     case 4:
         if(!vag_dispatch_type_3_4(dispatch_byte)) {
             FURI_LOG_W(TAG, "Type 4: dispatch mismatch 0x%02X", dispatch_byte);
@@ -348,26 +387,34 @@ static void vag_parse_data(SubGhzProtocolDecoderVAG* instance) {
         {
             uint8_t block_copy[8];
             memcpy(block_copy, block, 8);
-            
+
             if(!vag_aut64_decrypt(block_copy, 2)) {
                 FURI_LOG_E(TAG, "Type 4: key 2 not loaded");
                 break;
             }
             if(!vag_button_matches(block_copy, dispatch_byte)) {
-                FURI_LOG_W(TAG, "Type 4: button mismatch dec[7]=0x%02X dispatch=0x%02X", block_copy[7], dispatch_byte);
+                FURI_LOG_W(
+                    TAG,
+                    "Type 4: button mismatch dec[7]=0x%02X dispatch=0x%02X",
+                    block_copy[7],
+                    dispatch_byte);
                 break;
             }
             vag_fill_from_decrypted(instance, block_copy, dispatch_byte);
-            FURI_LOG_I(TAG, "Type 4 decoded: Ser=%08lX Cnt=%06lX Btn=%d",
-                       (unsigned long)instance->serial, (unsigned long)instance->cnt, instance->btn);
+            FURI_LOG_I(
+                TAG,
+                "Type 4 decoded: Ser=%08lX Cnt=%06lX Btn=%d",
+                (unsigned long)instance->serial,
+                (unsigned long)instance->cnt,
+                instance->btn);
         }
         return;
-    
+
     default:
         FURI_LOG_W(TAG, "Unknown VAG type %d", instance->vag_type);
         break;
     }
-    
+
     instance->decrypted = false;
     instance->serial = 0;
     instance->cnt = 0;
@@ -407,7 +454,7 @@ void* subghz_protocol_decoder_vag_alloc(SubGhzEnvironment* environment) {
     instance->btn = 0;
     instance->check_byte = 0;
 
-    protocol_vag_load_keys(APP_ASSETS_PATH("vw"));
+    protocol_vag_load_keys(APP_ASSETS_PATH("vag"));
 
     return instance;
 }
@@ -611,9 +658,9 @@ void subghz_protocol_decoder_vag_feed(void* context, bool level, uint32_t durati
                 (unsigned long)instance->key1_low,
                 (unsigned int)(instance->key2_low & 0xFFFF),
                 instance->vag_type);
-            
+
             vag_parse_data(instance);
-            
+
             if(instance->base.callback) {
                 instance->base.callback(&instance->base, instance->base.context);
             }
@@ -791,9 +838,9 @@ void subghz_protocol_decoder_vag_feed(void* context, bool level, uint32_t durati
             (unsigned long)instance->key1_low,
             (unsigned int)(instance->key2_low & 0xFFFF),
             instance->vag_type);
-        
+
         vag_parse_data(instance);
-        
+
         if(instance->base.callback) {
             instance->base.callback(&instance->base, instance->base.context);
         }
@@ -840,7 +887,7 @@ SubGhzProtocolStatus subghz_protocol_decoder_vag_serialize(
 
     instance->generic.data = key1;
     instance->generic.data_count_bit = instance->data_count_bit;
-    
+
     if(instance->decrypted) {
         instance->generic.serial = instance->serial;
         instance->generic.cnt = instance->cnt;
@@ -886,7 +933,7 @@ SubGhzProtocolStatus
         }
 
         instance->data_count_bit = instance->generic.data_count_bit;
-        
+
         instance->decrypted = false;
         vag_parse_data(instance);
     }
@@ -927,7 +974,7 @@ void subghz_protocol_decoder_vag_get_string(void* context, FuriString* output) {
         vehicle_name = "VAG";
         break;
     }
-    
+
     instance->generic.protocol_name = vehicle_name;
 
     if(instance->decrypted) {
