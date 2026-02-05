@@ -674,8 +674,8 @@ void subghz_protocol_decoder_vag_feed(void* context, bool level, uint32_t durati
             return;
         }
         if(instance->bit_count == 80) {
-            instance->key2_low = ~instance->data_low;
-            instance->key2_high = ~instance->data_high;
+            instance->key2_low = (~instance->data_low) & 0xFFFF;
+            instance->key2_high = 0;
             instance->data_count_bit = 80;
             FURI_LOG_I(
                 TAG,
@@ -853,8 +853,8 @@ void subghz_protocol_decoder_vag_feed(void* context, bool level, uint32_t durati
         if(instance->bit_count != 80) {
             break;
         }
-        instance->key2_low = instance->data_low;
-        instance->key2_high = instance->data_high;
+        instance->key2_low = instance->data_low & 0xFFFF;
+        instance->key2_high = 0;
         instance->data_count_bit = 80;
         instance->vag_type = 3;
         FURI_LOG_I(
@@ -929,7 +929,7 @@ SubGhzProtocolStatus subghz_protocol_decoder_vag_serialize(
         instance->vag_type);
 
     uint64_t key1 = ((uint64_t)instance->key1_high << 32) | instance->key1_low;
-    uint64_t key2 = ((uint64_t)instance->key2_high << 32) | instance->key2_low;
+    uint16_t key2_16bit = (uint16_t)(instance->key2_low & 0xFFFF);
 
     FURI_LOG_I(
         TAG,
@@ -957,7 +957,10 @@ SubGhzProtocolStatus subghz_protocol_decoder_vag_serialize(
     FURI_LOG_I(TAG, "Generic serialize returned: %d", ret);
 
     if(ret == SubGhzProtocolStatusOk) {
-        flipper_format_write_hex(flipper_format, "Key2", (uint8_t*)&key2, 8);
+        uint8_t key2_bytes[8] = {0, 0, 0, 0, 0, 0, 0, 0};
+        key2_bytes[6] = (uint8_t)((key2_16bit >> 8) & 0xFF);
+        key2_bytes[7] = (uint8_t)(key2_16bit & 0xFF);
+        flipper_format_write_hex(flipper_format, "Key2", key2_bytes, 8);
         FURI_LOG_I(TAG, "Wrote Key2");
 
         uint32_t type = instance->vag_type;
@@ -998,11 +1001,14 @@ SubGhzProtocolStatus
         instance->key1_low = (uint32_t)key1;
         instance->key1_high = (uint32_t)(key1 >> 32);
 
-        uint64_t key2 = 0;
+        uint8_t key2_bytes[8] = {0, 0, 0, 0, 0, 0, 0, 0};
         flipper_format_rewind(flipper_format);
-        if(flipper_format_read_hex(flipper_format, "Key2", (uint8_t*)&key2, 8)) {
-            instance->key2_low = (uint32_t)key2;
-            instance->key2_high = (uint32_t)(key2 >> 32);
+        if(flipper_format_read_hex(flipper_format, "Key2", key2_bytes, 8)) {
+            uint16_t key2_16bit = ((uint16_t)key2_bytes[6] << 8) | (uint16_t)key2_bytes[7];
+            instance->key2_low = (uint32_t)key2_16bit & 0xFFFF;
+            instance->key2_high = 0;
+            FURI_LOG_D(TAG, "Read Key2 from file: bytes[6]=0x%02X bytes[7]=0x%02X normalized=0x%04X", 
+                key2_bytes[6], key2_bytes[7], (unsigned int)key2_16bit);
         }
 
         uint32_t type = 0;
@@ -1168,7 +1174,9 @@ static void vag_encoder_build_type1(SubGhzProtocolEncoderVAG* instance) {
         (uint32_t)block[2];
     instance->key1_low = ((uint32_t)block[3] << 24) | ((uint32_t)block[4] << 16) |
                          ((uint32_t)block[5] << 8) | (uint32_t)block[6];
-    instance->key2_low = ((uint32_t)block[7] << 8) | dispatch;
+    uint32_t key2_upper = ((uint32_t)(block[7] & 0xFF) << 8);
+    uint32_t key2_lower = (uint32_t)(dispatch & 0xFF);
+    instance->key2_low = (key2_upper | key2_lower) & 0xFFFF;
     instance->key2_high = 0;
 
     for(int i = 0; i < 220; i++) {
@@ -1318,7 +1326,9 @@ static void vag_encoder_build_type2(SubGhzProtocolEncoderVAG* instance) {
         (uint32_t)block[2];
     instance->key1_low = ((uint32_t)block[3] << 24) | ((uint32_t)block[4] << 16) |
                          ((uint32_t)block[5] << 8) | (uint32_t)block[6];
-    instance->key2_low = ((uint32_t)block[7] << 8) | dispatch;
+    uint32_t key2_upper = ((uint32_t)(block[7] & 0xFF) << 8);
+    uint32_t key2_lower = (uint32_t)(dispatch & 0xFF);
+    instance->key2_low = (key2_upper | key2_lower) & 0xFFFF;
     instance->key2_high = 0;
 
     for(int i = 0; i < 220; i++) {
@@ -1456,7 +1466,9 @@ static void vag_encoder_build_type3_4(SubGhzProtocolEncoderVAG* instance) {
         (uint32_t)block[2];
     instance->key1_low = ((uint32_t)block[3] << 24) | ((uint32_t)block[4] << 16) |
                          ((uint32_t)block[5] << 8) | (uint32_t)block[6];
-    instance->key2_low = ((uint32_t)block[7] << 8) | dispatch;
+    uint32_t key2_upper = ((uint32_t)(block[7] & 0xFF) << 8);
+    uint32_t key2_lower = (uint32_t)(dispatch & 0xFF);
+    instance->key2_low = (key2_upper | key2_lower) & 0xFFFF;
     instance->key2_high = 0;
 
     uint64_t key1 = ((uint64_t)instance->key1_high << 32) | instance->key1_low;
@@ -1712,18 +1724,22 @@ SubGhzProtocolStatus
             (unsigned long)instance->key1_high,
             (unsigned long)instance->key1_low);
 
-        uint64_t key2 = 0;
+        uint8_t key2_bytes[8] = {0, 0, 0, 0, 0, 0, 0, 0};
         flipper_format_rewind(flipper_format);
-        if(!flipper_format_read_hex(flipper_format, "Key2", (uint8_t*)&key2, 8)) {
+        if(!flipper_format_read_hex(flipper_format, "Key2", key2_bytes, 8)) {
             FURI_LOG_E(TAG, "Encoder deserialize: Key2 not found in file");
             ret = SubGhzProtocolStatusErrorParserOthers;
             break;
         }
-        instance->key2_low = (uint32_t)key2;
-        instance->key2_high = (uint32_t)(key2 >> 32);
+        uint16_t key2_16bit = ((uint16_t)key2_bytes[6] << 8) | (uint16_t)key2_bytes[7];
+        instance->key2_low = (uint32_t)key2_16bit & 0xFFFF;
+        instance->key2_high = 0;
         FURI_LOG_I(
             TAG,
-            "Loaded Key2: %08lX%08lX",
+            "Loaded Key2: bytes[6]=0x%02X bytes[7]=0x%02X normalized=0x%04X (stored as %08lX%08lX)",
+            key2_bytes[6],
+            key2_bytes[7],
+            (unsigned int)key2_16bit,
             (unsigned long)instance->key2_high,
             (unsigned long)instance->key2_low);
 
@@ -1824,6 +1840,12 @@ SubGhzProtocolStatus
             (unsigned long)old_cnt,
             (unsigned long)instance->cnt);
 
+        uint8_t type_byte = (uint8_t)(instance->key1_high >> 24);
+        if(instance->vag_type == 1 && type_byte == 0x00) {
+            FURI_LOG_I(TAG, "Detected Passat signal (type_byte 0x00), converting type 1 -> type 2 to fix key2 issue");
+            instance->vag_type = 2;
+        }
+
         FURI_LOG_I(TAG, "Building upload for type %d...", instance->vag_type);
         switch(instance->vag_type) {
         case 1:
@@ -1872,8 +1894,13 @@ SubGhzProtocolStatus
         }
 
         flipper_format_rewind(flipper_format);
-        uint64_t new_key2 = ((uint64_t)instance->key2_high << 32) | instance->key2_low;
-        if(!flipper_format_update_hex(flipper_format, "Key2", (uint8_t*)&new_key2, 8)) {
+        instance->key2_high = 0;
+        uint16_t key2_write = (uint16_t)(instance->key2_low & 0xFFFF);
+        instance->key2_low = (uint32_t)key2_write;
+        uint8_t key2_write_bytes[8] = {0, 0, 0, 0, 0, 0, 0, 0};
+        key2_write_bytes[6] = (uint8_t)((key2_write >> 8) & 0xFF);
+        key2_write_bytes[7] = (uint8_t)(key2_write & 0xFF);
+        if(!flipper_format_update_hex(flipper_format, "Key2", key2_write_bytes, 8)) {
             FURI_LOG_W(TAG, "Failed to update Key2 in file (non-fatal)");
         }
 
@@ -1905,13 +1932,21 @@ SubGhzProtocolStatus
             flipper_format_insert_or_update_uint32(flipper_format, "KeyIdx", &key_idx32, 1);
         }
 
+        flipper_format_rewind(flipper_format);
+        uint32_t type32 = instance->vag_type;
+        if(!flipper_format_update_uint32(flipper_format, "Type", &type32, 1)) {
+            flipper_format_rewind(flipper_format);
+            flipper_format_insert_or_update_uint32(flipper_format, "Type", &type32, 1);
+        }
+
         FURI_LOG_I(
             TAG,
-            "Updated file: Serial=%08lX Cnt=%06lX Btn=%02X KeyIdx=%d",
+            "Updated file: Serial=%08lX Cnt=%06lX Btn=%02X KeyIdx=%d Type=%d",
             (unsigned long)instance->serial,
             (unsigned long)instance->cnt,
             instance->btn,
-            instance->key_idx);
+            instance->key_idx,
+            instance->vag_type);
 
         instance->repeat = 10;
         instance->front = 0;
