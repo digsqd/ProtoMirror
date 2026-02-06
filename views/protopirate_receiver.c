@@ -7,6 +7,8 @@
 #include <math.h>
 #include <assets_icons.h>
 
+#include "proto_pirate_icons.h"
+
 #define FRAME_HEIGHT             12
 #define MAX_LEN_PX               112
 #define MENU_ITEMS               4u
@@ -302,12 +304,12 @@ void protopirate_view_receiver_draw(Canvas* canvas, ProtoPirateReceiverModel* mo
 
             // Static guide circles (very faint)
             for(int angle = 0; angle < 360; angle += 45) {
-                float rad = angle * 3.14159 / 180.0;
+                float rad = angle * 3.14159f / 180.0f;
                 canvas_draw_dot(canvas, center_x + 15 * cosf(rad), center_y + 15 * sinf(rad));
             }
 
             // Rotating sweep line with glow effect
-            float sweep_angle = (model->animation_frame * 3.75) * 3.14159 / 180.0;
+            float sweep_angle = (model->animation_frame * 3.75f) * 3.14159f / 180.0f;
 
             // Main sweep line
             int sweep_x = center_x + 22 * cosf(sweep_angle);
@@ -315,8 +317,8 @@ void protopirate_view_receiver_draw(Canvas* canvas, ProtoPirateReceiverModel* mo
             canvas_draw_line(canvas, center_x, center_y, sweep_x, sweep_y);
 
             // Sweep "glow" - additional lines at slight offsets
-            float glow_angle1 = sweep_angle - 0.05;
-            float glow_angle2 = sweep_angle + 0.05;
+            float glow_angle1 = sweep_angle - 0.05f;
+            float glow_angle2 = sweep_angle + 0.05f;
             canvas_draw_line(
                 canvas,
                 center_x,
@@ -332,7 +334,7 @@ void protopirate_view_receiver_draw(Canvas* canvas, ProtoPirateReceiverModel* mo
 
             // Sweep trail (fading dots)
             for(int i = 1; i <= 12; i++) {
-                float trail_angle = sweep_angle - (i * 0.15);
+                float trail_angle = sweep_angle - (i * 0.15f);
                 int trail_radius = 22 - i;
                 if(trail_radius > 0) {
                     int trail_x = center_x + trail_radius * cosf(trail_angle);
@@ -356,10 +358,13 @@ void protopirate_view_receiver_draw(Canvas* canvas, ProtoPirateReceiverModel* mo
             }
         } else {
             canvas_draw_icon(
-                canvas, 0, 0, model->external_radio ? &I_Fishing_123x52 : &I_Scanning_123x52);
-            canvas_set_font(canvas, FontPrimary);
-            canvas_draw_str(canvas, 63, 46, "Scanning...");
-            canvas_set_font(canvas, FontSecondary);
+                canvas,
+                0,
+                0,
+                model->external_radio ? &I_PP_scanning_ext_123x52 : &I_PP_scanning_123x52);
+            //canvas_set_font(canvas, FontPrimary);
+            //canvas_draw_str(canvas, 63, 46, "Scanning...");
+            //canvas_set_font(canvas, FontSecondary);
             //canvas_draw_str(canvas, 44, 10, model->external_radio ? "Ext" : "Int");       //FOR EXACT FLIPPER CLONE
         }
 
