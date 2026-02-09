@@ -1,3 +1,5 @@
+#pragma once
+
 //#define ENABLE_TIMING_TUNER_SCENE
 #define ENABLE_SUB_DECODE_SCENE
 
