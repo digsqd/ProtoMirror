@@ -17,6 +17,7 @@ typedef struct {
     FlipperFormat* flipper_format;
     SubGhzTransmitter* transmitter;
     bool is_transmitting;
+    bool flag_stop_called;
 } EmulateContext;
 
 static EmulateContext* emulate_context = NULL;
@@ -350,14 +351,6 @@ void protopirate_scene_emulate_on_enter(void* context) {
         emulate_context_free();
     }
 
-    // Use TX-only init instead of full radio init
-    if(!protopirate_tx_init(app)) {
-        FURI_LOG_E(TAG, "Failed to initialize radio for TX!");
-        notification_message(app->notifications, &sequence_error);
-        scene_manager_previous_scene(app->scene_manager);
-        return;
-    }
-
     // Create emulate context
     emulate_context = malloc(sizeof(EmulateContext));
     if(!emulate_context) {
@@ -472,10 +465,6 @@ void protopirate_scene_emulate_on_enter(void* context) {
         if(protocol) {
             if(protocol->encoder && protocol->encoder->alloc) {
                 FURI_LOG_I(TAG, "Protocol has encoder support");
-
-                // Make sure the protocol registry is set in the environment
-                subghz_environment_set_protocol_registry(
-                    app->txrx->environment, &protopirate_protocol_registry);
 
                 // Try to create transmitter
                 emulate_context->transmitter =
@@ -667,12 +656,19 @@ bool protopirate_scene_emulate_on_event(void* context, SceneManagerEvent event) 
                 if((furi_get_tick() - app->start_tx_time) > MIN_TX_TIME) {
                     stop_tx(app);
                     emulate_context->is_transmitting = false;
+                } else {
+                    emulate_context->flag_stop_called = true;
                 }
             }
             consumed = true;
             break;
 
         case ProtoPirateCustomEventEmulateExit:
+            if(app->txrx->txrx_state == ProtoPirateTxRxStateTx) {
+                stop_tx(app);
+                emulate_context->is_transmitting = false;
+                emulate_context->flag_stop_called = false;
+            }
             scene_manager_previous_scene(app->scene_manager);
             consumed = true;
             break;
@@ -684,11 +680,15 @@ bool protopirate_scene_emulate_on_event(void* context, SceneManagerEvent event) 
         if(emulate_context && emulate_context->is_transmitting) {
             if(app->txrx->txrx_state == ProtoPirateTxRxStateTx) {
                 //Are we supposed to be stopping the TX from the MIN_TX
-                if(app->start_tx_time && ((furi_get_tick() - app->start_tx_time) > MIN_TX_TIME)) {
+                if((app->start_tx_time &&
+                    ((furi_get_tick() - app->start_tx_time) > MIN_TX_TIME)) &&
+                   emulate_context->flag_stop_called) {
                     stop_tx(app);
                     emulate_context->is_transmitting = false;
-                } else
+                    emulate_context->flag_stop_called = false;
+                } else {
                     notification_message(app->notifications, &sequence_blink_magenta_10);
+                }
             }
         }
 

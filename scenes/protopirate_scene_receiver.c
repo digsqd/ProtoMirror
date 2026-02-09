@@ -137,14 +137,6 @@ void protopirate_scene_receiver_on_enter(void* context) {
 
     FURI_LOG_I(TAG, "=== ENTERING RECEIVER SCENE ===");
 
-    // Initialize radio if not already done (DEFERRED INIT)
-    if(!protopirate_radio_init(app)) {
-        FURI_LOG_E(TAG, "Failed to initialize radio!");
-        notification_message(app->notifications, &sequence_error);
-        scene_manager_previous_scene(app->scene_manager);
-        return;
-    }
-
 // Now safe to access radio device
 #ifndef REMOVE_LOGS
     bool is_external =
@@ -156,6 +148,30 @@ void protopirate_scene_receiver_on_enter(void* context) {
     FURI_LOG_I(TAG, "Modulation: %s", furi_string_get_cstr(app->txrx->preset->name));
     FURI_LOG_I(TAG, "Auto-save: %s", app->auto_save ? "ON" : "OFF");
 #endif
+
+    // Allocate history
+    if(!app->txrx->history) {
+        app->txrx->history = protopirate_history_alloc();
+        if(!app->txrx->history) {
+            FURI_LOG_E(TAG, "Failed to allocate history!");
+            return;
+        }
+    }
+
+    // Allocate worker
+    if(!app->txrx->worker) {
+        app->txrx->worker = subghz_worker_alloc();
+        if(!app->txrx->worker) {
+            FURI_LOG_E(TAG, "Failed to allocate worker!");
+            return;
+        }
+        // Set up worker callbacks
+        subghz_worker_set_overrun_callback(
+            app->txrx->worker, (SubGhzWorkerOverrunCallback)subghz_receiver_reset);
+        subghz_worker_set_pair_callback(
+            app->txrx->worker, (SubGhzWorkerPairCallback)subghz_receiver_decode);
+        subghz_worker_set_context(app->txrx->worker, app->txrx->receiver);
+    }
 
     // Set up the receiver callback
     subghz_receiver_set_rx_callback(app->txrx->receiver, protopirate_scene_receiver_callback, app);
@@ -292,6 +308,13 @@ void protopirate_scene_receiver_on_exit(void* context) {
     if(app->radio_initialized && app->txrx->txrx_state == ProtoPirateTxRxStateRx) {
         protopirate_rx_end(app);
     }
+    if(app->txrx->worker) {
+        FURI_LOG_D(TAG, "Freeing worker %p", app->txrx->worker);
+        subghz_worker_free(app->txrx->worker);
+        app->txrx->worker = NULL;
+    } else {
+        FURI_LOG_D(TAG, "Worker was NULL, skipping free");
+    }
 
     if(scene_manager_get_scene_state(app->scene_manager, ProtoPirateSceneReceiver) == 1) {
         scene_manager_set_scene_state(app->scene_manager, ProtoPirateSceneReceiver, 0);
@@ -304,8 +327,13 @@ void protopirate_scene_receiver_on_exit(void* context) {
         protopirate_history_reset(app->txrx->history);
     }
 
-    // Deinitialize radio to free up memory
-    protopirate_radio_deinit(app);
+    if(app->txrx->history) {
+        FURI_LOG_D(TAG, "Freeing history %p", app->txrx->history);
+        protopirate_history_free(app->txrx->history);
+        app->txrx->history = NULL;
+    } else {
+        FURI_LOG_D(TAG, "History was NULL, skipping free");
+    }
 }
 
 void protopirate_scene_receiver_view_callback(ProtoPirateCustomEvent event, void* context) {

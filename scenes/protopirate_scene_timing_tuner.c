@@ -1,5 +1,6 @@
 // scenes/protopirate_scene_timing_tuner.c
 #include "../protopirate_app_i.h"
+#ifdef ENABLE_TIMING_TUNER_SCENE
 #include "../protocols/protocol_items.h"
 #include <gui/elements.h>
 #include <math.h>
@@ -610,13 +611,6 @@ void protopirate_scene_timing_tuner_on_enter(void* context) {
 
     FURI_LOG_I(TAG, "Entering Timing Tuner");
 
-    if(!protopirate_radio_init(app)) {
-        FURI_LOG_E(TAG, "Failed to initialize radio!");
-        notification_message(app->notifications, &sequence_error);
-        scene_manager_previous_scene(app->scene_manager);
-        return;
-    }
-
     g_timing_ctx = malloc(sizeof(TimingTunerContext));
     memset(g_timing_ctx, 0, sizeof(TimingTunerContext));
     g_timing_ctx->is_receiving = false;
@@ -633,6 +627,21 @@ void protopirate_scene_timing_tuner_on_enter(void* context) {
     view_set_draw_callback(app->view_about, timing_tuner_draw_callback);
     view_set_input_callback(app->view_about, timing_tuner_input_callback);
     view_set_context(app->view_about, app);
+
+    // Allocate worker
+    if(!app->txrx->worker) {
+        app->txrx->worker = subghz_worker_alloc();
+        if(!app->txrx->worker) {
+            FURI_LOG_E(TAG, "Failed to allocate worker!");
+            return;
+        }
+        // Set up worker callbacks
+        subghz_worker_set_overrun_callback(
+            app->txrx->worker, (SubGhzWorkerOverrunCallback)subghz_receiver_reset);
+        subghz_worker_set_pair_callback(
+            app->txrx->worker, (SubGhzWorkerPairCallback)subghz_receiver_decode);
+        subghz_worker_set_context(app->txrx->worker, app->txrx->receiver);
+    }
 
     subghz_receiver_set_rx_callback(app->txrx->receiver, timing_tuner_rx_callback, app);
 
@@ -688,6 +697,14 @@ void protopirate_scene_timing_tuner_on_exit(void* context) {
     subghz_worker_set_pair_callback(
         app->txrx->worker, (SubGhzWorkerPairCallback)subghz_receiver_decode);
 
+    if(app->txrx->worker) {
+        FURI_LOG_D(TAG, "Freeing worker %p", app->txrx->worker);
+        subghz_worker_free(app->txrx->worker);
+        app->txrx->worker = NULL;
+    } else {
+        FURI_LOG_D(TAG, "Worker was NULL, skipping free");
+    }
+
     view_set_draw_callback(app->view_about, NULL);
     view_set_input_callback(app->view_about, NULL);
 
@@ -696,3 +713,4 @@ void protopirate_scene_timing_tuner_on_exit(void* context) {
         g_timing_ctx = NULL;
     }
 }
+#endif

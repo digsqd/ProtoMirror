@@ -4,7 +4,7 @@
 #include <storage/storage.h>
 #include <flipper_format/flipper_format.h>
 
-#define RAW_READER_BUFFER_SIZE 256
+#define RAW_READER_BUFFER_SIZE 512
 
 typedef struct {
     Storage* storage;
@@ -12,6 +12,7 @@ typedef struct {
     int32_t buffer[RAW_READER_BUFFER_SIZE];
     size_t buffer_count;
     size_t buffer_index;
+    uint32_t count;
     bool file_finished;
     bool current_level;
     bool storage_opened;
