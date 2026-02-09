@@ -134,7 +134,11 @@ bool protopirate_history_add_to_history(
     item->preset = malloc(sizeof(SubGhzRadioPreset));
     item->preset->frequency = preset->frequency;
     item->preset->name = furi_string_alloc();
-    furi_string_set(item->preset->name, preset->name);
+    if(preset->name) {
+        furi_string_set(item->preset->name, preset->name);
+    } else {
+        furi_string_set(item->preset->name, "UNKNOWN");
+    }
     item->preset->data = preset->data;
     item->preset->data_size = preset->data_size;
 
