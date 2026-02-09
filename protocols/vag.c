@@ -125,7 +125,7 @@ static void vag_tea_decrypt(uint32_t* v0, uint32_t* v1, const uint32_t* key_sche
         *v0 -= (((*v1 << 4) ^ (*v1 >> 5)) + *v1) ^ (sum + key_schedule[sum & 3]);
     }
 }
-
+#ifdef ENABLE_EMULATE_FEATURE
 static void vag_tea_encrypt(uint32_t* v0, uint32_t* v1, const uint32_t* key_schedule) {
     uint32_t sum = 0;
     for(int i = 0; i < VAG_TEA_ROUNDS; i++) {
@@ -134,7 +134,7 @@ static void vag_tea_encrypt(uint32_t* v0, uint32_t* v1, const uint32_t* key_sche
         *v1 += (((*v0 << 4) ^ (*v0 >> 5)) + *v0) ^ (sum + key_schedule[(sum >> 11) & 3]);
     }
 }
-
+#endif
 static bool vag_dispatch_type_1_2(uint8_t dispatch) {
     return (dispatch == 0x2A || dispatch == 0x1C || dispatch == 0x46);
 }
@@ -449,7 +449,7 @@ const SubGhzProtocolDecoder subghz_protocol_vag_decoder = {
     .deserialize = subghz_protocol_decoder_vag_deserialize,
     .get_string = subghz_protocol_decoder_vag_get_string,
 };
-
+#ifdef ENABLE_EMULATE_FEATURE
 const SubGhzProtocolEncoder subghz_protocol_vag_encoder = {
     .alloc = subghz_protocol_encoder_vag_alloc,
     .free = subghz_protocol_encoder_vag_free,
@@ -457,6 +457,15 @@ const SubGhzProtocolEncoder subghz_protocol_vag_encoder = {
     .stop = subghz_protocol_encoder_vag_stop,
     .yield = subghz_protocol_encoder_vag_yield,
 };
+#else
+const SubGhzProtocolEncoder subghz_protocol_vag_encoder = {
+    .alloc = NULL,
+    .free = NULL,
+    .deserialize = NULL,
+    .stop = NULL,
+    .yield = NULL,
+};
+#endif
 
 const SubGhzProtocol vag_protocol = {
     .name = VAG_PROTOCOL_NAME,
@@ -1030,6 +1039,8 @@ SubGhzProtocolStatus
     return ret;
 }
 
+#ifdef ENABLE_EMULATE_FEATURE
+
 typedef struct SubGhzProtocolEncoderVAG {
     SubGhzProtocolEncoderBase base;
     SubGhzBlockGeneric generic;
@@ -1599,6 +1610,7 @@ static void vag_encoder_build_type3_4(SubGhzProtocolEncoderVAG* instance) {
         FURI_LOG_W(TAG, "WARNING: Pulse count %zu != expected 518!", index);
     }
 }
+#endif
 
 void subghz_protocol_decoder_vag_get_string(void* context, FuriString* output) {
     furi_assert(context);
@@ -1665,6 +1677,7 @@ void subghz_protocol_decoder_vag_get_string(void* context, FuriString* output) {
 
 #define VAG_ENCODER_UPLOAD_MAX_SIZE 680
 
+#ifdef ENABLE_EMULATE_FEATURE
 void* subghz_protocol_encoder_vag_alloc(SubGhzEnvironment* environment) {
     UNUSED(environment);
     FURI_LOG_I(TAG, "VAG encoder alloc");
@@ -2003,3 +2016,4 @@ SubGhzProtocolStatus
 
     return ret;
 }
+#endif
