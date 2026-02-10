@@ -547,6 +547,8 @@ ProtoPirateReceiver* protopirate_view_receiver_alloc(bool auto_save) {
             model->lock_count = 0;
             model->auto_save = auto_save;
             model->animation_frame = 0;
+            model->dolphin_view = false;
+            model->sub_decode_mode = false;
         },
         true);
 
