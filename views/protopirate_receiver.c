@@ -404,6 +404,8 @@ bool protopirate_view_receiver_input(InputEvent* event, void* context) {
         receiver->view, ProtoPirateReceiverModel * model, { lock = model->lock; }, false);
 
     if(lock == ProtoPirateLockOn) {
+        bool do_unlock_cb = false;
+
         with_view_model(
             receiver->view,
             ProtoPirateReceiverModel * model,
@@ -414,10 +416,7 @@ bool protopirate_view_receiver_input(InputEvent* event, void* context) {
                         if(model->lock_count >= UNLOCK_CNT) {
                             model->lock = ProtoPirateLockOff;
                             model->lock_count = 0;
-                            if(receiver->callback) {
-                                receiver->callback(
-                                    ProtoPirateCustomEventViewReceiverUnlock, receiver->context);
-                            }
+                            do_unlock_cb = true;
                         }
                     }
                 } else if(
@@ -427,6 +426,11 @@ bool protopirate_view_receiver_input(InputEvent* event, void* context) {
                 }
             },
             true);
+
+        if(do_unlock_cb && receiver->callback) {
+            receiver->callback(ProtoPirateCustomEventViewReceiverUnlock, receiver->context);
+        }
+
         consumed = true;
     } else if(
         event->type == InputTypeShort || event->type == InputTypeLong ||
