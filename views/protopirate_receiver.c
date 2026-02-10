@@ -48,7 +48,12 @@ static void protopirate_view_rssi_draw(Canvas* canvas, ProtoPirateReceiverModel*
     uint8_t u_rssi = 0;
 
     if(model->rssi >= SUBGHZ_RAW_THRESHOLD_MIN) {
-        u_rssi = (uint8_t)(model->rssi - SUBGHZ_RAW_THRESHOLD_MIN);
+        /* Clamp to a sane range to prevent wrap and off-screen drawing */
+        /* we are using 90.0 to keep (46 + i + (i/5)) within screen bounds (128px wide) */
+        float v = model->rssi - SUBGHZ_RAW_THRESHOLD_MIN;
+        if(v < 0.0f) v = 0.0f;
+        if(v > 90.0f) v = 90.0f; /* 90 is arbitrary but safe for the screen width */
+        u_rssi = (uint8_t)v;
     }
 
     //Add a 1px space between the segments
