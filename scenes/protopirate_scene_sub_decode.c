@@ -877,14 +877,12 @@ bool protopirate_scene_sub_decode_on_event(void* context, SceneManagerEvent even
                     uint16_t history_count = protopirate_history_get_item(ctx->history);
 
                     if(history_count > 0) {
-                        subghz_receiver_reset(app->txrx->receiver);
                         ctx->state = DecodeStateShowSuccess;
                         ctx->selected_history_index = 0;
                         ctx->showing_signal_info = false;
                         ctx->result_display_counter = 0;
                         notification_message(app->notifications, &sequence_success);
                     } else {
-                        subghz_receiver_reset(app->txrx->receiver);
                         furi_string_printf(
                             ctx->result,
                             "RAW Signal\n\n"
@@ -1085,6 +1083,8 @@ bool protopirate_scene_sub_decode_on_event(void* context, SceneManagerEvent even
 
 void protopirate_scene_sub_decode_on_exit(void* context) {
     ProtoPirateApp* app = context;
+
+    subghz_receiver_reset(app->txrx->receiver);
 
     subghz_receiver_set_rx_callback(app->txrx->receiver, NULL, NULL);
 
