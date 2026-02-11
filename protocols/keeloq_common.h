@@ -13,8 +13,10 @@
 
 #include <m-array.h>
 
+// Extracts bit number n from integer x
 #define bit(x, n) (((x) >> (n)) & 1)
 
+// Builds a 5-bit number from five selected bit positions in x
 #define g5(x, a, b, c, d, e) \
     (bit(x, a) + bit(x, b) * 2 + bit(x, c) * 4 + bit(x, d) * 8 + bit(x, e) * 16)
 
@@ -52,7 +54,8 @@ struct SubGhzKeystore {
  * @param key - manufacture (64bit)
  * @return keeloq encrypt data
  */
-static inline uint32_t subghz_protocol_keeloq_common_encrypt(const uint32_t data, const uint64_t key) {
+static inline uint32_t
+    subghz_protocol_keeloq_common_encrypt(const uint32_t data, const uint64_t key) {
     uint32_t x = data, r;
     for(r = 0; r < 528; r++)
         x = (x >> 1) ^ ((bit(x, 0) ^ bit(x, 16) ^ (uint32_t)bit(key, r & 63) ^
@@ -67,7 +70,8 @@ static inline uint32_t subghz_protocol_keeloq_common_encrypt(const uint32_t data
  * @param key - manufacture (64bit)
  * @return 0xBSSSCCCC, B(4bit) key, S(10bit) serial&0x3FF, C(16bit) counter
  */
-static inline uint32_t subghz_protocol_keeloq_common_decrypt(const uint32_t data, const uint64_t key) {
+static inline uint32_t
+    subghz_protocol_keeloq_common_decrypt(const uint32_t data, const uint64_t key) {
     uint32_t x = data, r;
     for(r = 0; r < 528; r++)
         x = (x << 1) ^ bit(x, 31) ^ bit(x, 15) ^ (uint32_t)bit(key, (15 - r) & 63) ^
@@ -81,7 +85,8 @@ static inline uint32_t subghz_protocol_keeloq_common_decrypt(const uint32_t data
  * @param key - manufacture (64bit)
  * @return manufacture for this serial number (64bit)
  */
-static inline uint64_t subghz_protocol_keeloq_common_normal_learning(uint32_t data, const uint64_t key) {
+static inline uint64_t
+    subghz_protocol_keeloq_common_normal_learning(uint32_t data, const uint64_t key) {
     uint32_t k1, k2;
 
     data &= 0x0FFFFFFF;
@@ -101,7 +106,8 @@ static inline uint64_t subghz_protocol_keeloq_common_normal_learning(uint32_t da
  * @param xor - magic xor (64bit)
  * @return manufacture for this serial number (64bit)
  */
-static inline uint64_t subghz_protocol_keeloq_common_magic_xor_type1_learning(uint32_t data, uint64_t xor) {
+static inline uint64_t
+    subghz_protocol_keeloq_common_magic_xor_type1_learning(uint32_t data, uint64_t xor) {
     data &= 0x0FFFFFFF;
     return (((uint64_t)data << 32) | data) ^ xor;
 }
@@ -111,7 +117,8 @@ static inline uint64_t subghz_protocol_keeloq_common_magic_xor_type1_learning(ui
  * @param man - magic man (64bit)
  * @return manufacture for this serial number (64bit)
  */
-static inline uint64_t subghz_protocol_keeloq_common_magic_serial_type1_learning(uint32_t data, uint64_t man) {
+static inline uint64_t
+    subghz_protocol_keeloq_common_magic_serial_type1_learning(uint32_t data, uint64_t man) {
     return (man & 0xFFFFFFFF) | ((uint64_t)data << 40) |
            ((uint64_t)(((data & 0xff) + ((data >> 8) & 0xFF)) & 0xFF) << 32);
 }
@@ -121,7 +128,8 @@ static inline uint64_t subghz_protocol_keeloq_common_magic_serial_type1_learning
  * @param man - magic man (64bit)
  * @return manufacture for this serial number (64bit)
  */
-static inline uint64_t subghz_protocol_keeloq_common_magic_serial_type2_learning(uint32_t data, uint64_t man) {
+static inline uint64_t
+    subghz_protocol_keeloq_common_magic_serial_type2_learning(uint32_t data, uint64_t man) {
     uint8_t* p = (uint8_t*)&data;
     uint8_t* m = (uint8_t*)&man;
     m[7] = p[0];
@@ -136,6 +144,7 @@ static inline uint64_t subghz_protocol_keeloq_common_magic_serial_type2_learning
  * @param man - magic man (64bit)
  * @return manufacture for this serial number (64bit)
  */
-static inline uint64_t subghz_protocol_keeloq_common_magic_serial_type3_learning(uint32_t data, uint64_t man) {
+static inline uint64_t
+    subghz_protocol_keeloq_common_magic_serial_type3_learning(uint32_t data, uint64_t man) {
     return (man & 0xFFFFFFFFFF000000) | (data & 0xFFFFFF);
 }
