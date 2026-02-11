@@ -274,7 +274,8 @@ bool protopirate_scene_receiver_on_event(void* context, SceneManagerEvent event)
         }
 
         // Update RSSI from the correct radio device (only if initialized)
-        if(app->radio_initialized && app->txrx->txrx_state == ProtoPirateTxRxStateRx) {
+        if(app->radio_initialized && app->txrx->txrx_state == ProtoPirateTxRxStateRx &&
+           app->txrx->radio_device) {
             float rssi = subghz_devices_get_rssi(app->txrx->radio_device);
             protopirate_view_receiver_set_rssi(app->protopirate_receiver, rssi);
 
