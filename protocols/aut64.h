@@ -3,6 +3,9 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+// uncomment to activate key validation, index boundary verifications, ...
+//#define AUT64_ENABLE_VALIDATIONS
+
 #define AUT64_NUM_ROUNDS      12
 #define AUT64_BLOCK_SIZE      8
 #define AUT64_KEY_SIZE        8
@@ -26,8 +29,10 @@ struct aut64_key {
     uint8_t sbox[AUT64_SBOX_SIZE];
 };
 
+#ifdef AUT64_ENABLE_VALIDATIONS
 // Optional helper if callers want to check keys up-front.
 int aut64_validate_key(const struct aut64_key* key);
+#endif
 
 // Pointers are used for both the key and the message to avoid implicit copies.
 // The message buffer must be at least AUT64_BLOCK_SIZE bytes.

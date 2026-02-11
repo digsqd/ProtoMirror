@@ -96,6 +96,7 @@ static int reverse_box(uint8_t* reversed, const uint8_t* box, size_t len) {
 
     for(i = 0; i < len; i++) {
         const uint8_t v = box[i];
+#ifdef AUT64_ENABLE_VALIDATIONS
         if(v >= len) {
             return AUT64_ERR_INVALID_KEY;
         }
@@ -103,18 +104,23 @@ static int reverse_box(uint8_t* reversed, const uint8_t* box, size_t len) {
             // Duplicate value means it is not a permutation.
             return AUT64_ERR_INVALID_KEY;
         }
+#endif
         reversed[v] = (uint8_t)i;
     }
 
+#ifdef AUT64_ENABLE_VALIDATIONS
     for(i = 0; i < len; i++) {
         if(reversed[i] == 0xFF) {
             // Missing mapping.
             return AUT64_ERR_INVALID_KEY;
         }
     }
+#endif
 
     return AUT64_OK;
 }
+
+#ifdef AUT64_ENABLE_VALIDATIONS
 
 // Validate that 'box' is a permutation of 0..len-1.
 // Uses 0xFF sentinel logic to detect duplicates/missing values.
@@ -182,6 +188,8 @@ int aut64_validate_key(const struct aut64_key* key) {
 
     return AUT64_OK;
 }
+
+#endif // AUT64_ENABLE_VALIDATIONS
 
 // Compute one 4-bit contribution to the round key
 static uint8_t key_nibble(
@@ -306,11 +314,13 @@ int aut64_encrypt(const struct aut64_key* key, uint8_t* message) {
         return AUT64_ERR_NULL_POINTER;
     }
 
+#ifdef AUT64_ENABLE_VALIDATIONS
     // Validate key before doing anything. This prevents silent, unsafe behavior.
     rc = aut64_validate_key(key);
     if(rc != AUT64_OK) {
         return rc;
     }
+#endif
 
     // Build a reversed key (inverse pbox and sbox) ...
     // Fully initialize to avoid any uninitialized fields/padding.
@@ -341,16 +351,16 @@ int aut64_encrypt(const struct aut64_key* key, uint8_t* message) {
 
 // Decrypt one 8-byte block in place using the provided validated key.
 int aut64_decrypt(const struct aut64_key* key, uint8_t* message) {
-    int rc;
-
     if(!key || !message) {
         return AUT64_ERR_NULL_POINTER;
     }
 
-    rc = aut64_validate_key(key);
+#ifdef AUT64_ENABLE_VALIDATIONS
+    int rc = aut64_validate_key(key);
     if(rc != AUT64_OK) {
         return rc;
     }
+#endif
 
     for(int i = AUT64_NUM_ROUNDS - 1; i >= 0; i--) {
         message[AUT64_BLOCK_SIZE - 1] = substitute(key, message[AUT64_BLOCK_SIZE - 1]);
@@ -365,17 +375,17 @@ int aut64_decrypt(const struct aut64_key* key, uint8_t* message) {
 
 // Serialize a validated key structure into its 16-byte packed format.
 int aut64_pack(uint8_t* dest, const struct aut64_key* src) {
-    int rc;
-
     if(!dest || !src) {
         return AUT64_ERR_NULL_POINTER;
     }
 
+#ifdef AUT64_ENABLE_VALIDATIONS
     // Validate the key we are about to pack. This prevents producing garbage packed keys.
-    rc = aut64_validate_key(src);
+    int rc = aut64_validate_key(src);
     if(rc != AUT64_OK) {
         return rc;
     }
+#endif
 
     // Initialize the output so callers never observe stale bytes.
     memset(dest, 0, AUT64_PACKED_KEY_SIZE);
@@ -430,14 +440,14 @@ int aut64_unpack(struct aut64_key* dest, const uint8_t* src) {
         dest->sbox[i * 2 + 1] = (uint8_t)(src[i + 8] & 0xF);
     }
 
+#ifdef AUT64_ENABLE_VALIDATIONS
     // Validate what we just unpacked. If invalid, return error.
     // We do not fix up broken keys silently.
-    {
-        int rc = aut64_validate_key(dest);
-        if(rc != AUT64_OK) {
-            return AUT64_ERR_INVALID_PACKED;
-        }
+    int rc = aut64_validate_key(dest);
+    if(rc != AUT64_OK) {
+        return AUT64_ERR_INVALID_PACKED;
     }
+#endif
 
     return AUT64_OK;
 }
