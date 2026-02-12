@@ -226,18 +226,20 @@ SubGhzProtocolStatus
 
     do {
         FuriString* temp_str = furi_string_alloc();
+        furi_check(temp_str);
         if(!flipper_format_read_string(flipper_format, "Protocol", temp_str)) {
             FURI_LOG_E(TAG, "Missing Protocol");
             furi_string_free(temp_str);
+            temp_str = NULL;
             break;
         }
 
         if(!furi_string_equal(temp_str, instance->base.protocol->name)) {
             FURI_LOG_E(TAG, "Wrong protocol: %s", furi_string_get_cstr(temp_str));
             furi_string_free(temp_str);
+            temp_str = NULL;
             break;
         }
-        furi_string_free(temp_str);
 
         uint32_t bit_count_temp;
         if(!flipper_format_read_uint32(flipper_format, "Bit", &bit_count_temp, 1)) {
@@ -245,11 +247,16 @@ SubGhzProtocolStatus
             break;
         }
 
-        temp_str = furi_string_alloc();
         if(!flipper_format_read_string(flipper_format, "Key", temp_str)) {
             FURI_LOG_E(TAG, "Missing Key");
             furi_string_free(temp_str);
+            temp_str = NULL;
             break;
+        }
+
+        // if no string to decode return error
+        if(!temp_str) {
+            return ret;
         }
 
         const char* key_str = furi_string_get_cstr(temp_str);
