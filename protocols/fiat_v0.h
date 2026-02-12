@@ -12,20 +12,6 @@
 
 #include "../defines.h"
 
-#define FIAT_PROTOCOL_V0_NAME "Fiat V0"
-
-/* Worst-case encoder upload capacity (LevelDuration entries)
- * Per burst:
- * - preamble: FIAT_V0_PREAMBLE_PAIRS * 2
- * - data: max 141 entries (see encoder differential rules)
- * Between bursts: one inter-burst gap entry
- */
-#define FIAT_V0_DATA_MAX_EDGES  ((63 + 6) * 2 + 3)
-#define FIAT_V0_BURST_MAX_EDGES (FIAT_V0_PREAMBLE_PAIRS * 2 + FIAT_V0_DATA_MAX_EDGES)
-#define FIAT_V0_UPLOAD_CAP \
-    (FIAT_V0_TOTAL_BURSTS * FIAT_V0_BURST_MAX_EDGES + (FIAT_V0_TOTAL_BURSTS - 1))
-#define FIAT_V0_GAP_US 800
-
 typedef struct SubGhzProtocolDecoderFiatV0 SubGhzProtocolDecoderFiatV0;
 typedef struct SubGhzProtocolEncoderFiatV0 SubGhzProtocolEncoderFiatV0;
 
