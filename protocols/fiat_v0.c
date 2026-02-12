@@ -89,7 +89,7 @@ void* subghz_protocol_encoder_fiat_v0_alloc(SubGhzEnvironment* environment) {
     instance->generic.protocol_name = instance->base.protocol->name;
 
     instance->encoder.repeat = 10;
-    instance->encoder.size_upload = 1024;
+    instance->encoder.size_upload = FIAT_V0_UPLOAD_CAP;
     instance->encoder.upload = calloc(1, instance->encoder.size_upload * sizeof(LevelDuration));
     furi_check(instance->encoder.upload);
     instance->encoder.is_running = false;
@@ -108,8 +108,10 @@ void subghz_protocol_encoder_fiat_v0_free(void* context) {
 
 static void subghz_protocol_encoder_fiat_v0_get_upload(SubGhzProtocolEncoderFiatV0* instance) {
     furi_check(instance);
-    size_t index = 0;
+    /* Encoder buffer is pre-sized for the worst case */
+    furi_check(instance->encoder.size_upload >= FIAT_V0_UPLOAD_CAP);
 
+    size_t index = 0;
     uint32_t te_short = subghz_protocol_fiat_v0_const.te_short;
     uint32_t te_long = subghz_protocol_fiat_v0_const.te_long;
 
@@ -202,6 +204,8 @@ static void subghz_protocol_encoder_fiat_v0_get_upload(SubGhzProtocolEncoderFiat
         instance->encoder.upload[index++] = level_duration_make(false, te_short * 8);
     }
 
+    /* Guard against overflow if constants or bit counts change */
+    furi_check(index <= FIAT_V0_UPLOAD_CAP);
     instance->encoder.size_upload = index;
     instance->encoder.front = 0;
 
@@ -325,7 +329,8 @@ LevelDuration subghz_protocol_encoder_fiat_v0_yield(void* context) {
     furi_check(context);
     SubGhzProtocolEncoderFiatV0* instance = context;
 
-    if(!instance->encoder.is_running || instance->encoder.repeat == 0) {
+    if(!instance->encoder.is_running || !instance->encoder.size_upload ||
+       !instance->encoder.repeat) {
         instance->encoder.is_running = false;
         return level_duration_reset();
     }
@@ -348,6 +353,7 @@ void* subghz_protocol_decoder_fiat_v0_alloc(SubGhzEnvironment* environment) {
     UNUSED(environment);
     SubGhzProtocolDecoderFiatV0* instance = calloc(1, sizeof(SubGhzProtocolDecoderFiatV0));
     furi_check(instance);
+    subghz_protocol_decoder_fiat_v0_reset(instance);
     instance->base.protocol = &fiat_protocol_v0;
     instance->generic.protocol_name = instance->base.protocol->name;
     return instance;
@@ -363,7 +369,7 @@ void subghz_protocol_decoder_fiat_v0_reset(void* context) {
     furi_check(context);
     SubGhzProtocolDecoderFiatV0* instance = context;
     instance->decoder.parser_step = FiatV0DecoderStepReset;
-    instance->decoder_state = 0;
+    instance->decoder_state = FiatV0DecoderStepReset;
     instance->preamble_count = 0;
     instance->data_low = 0;
     instance->data_high = 0;
@@ -381,7 +387,7 @@ void subghz_protocol_decoder_fiat_v0_feed(void* context, bool level, uint32_t du
     uint32_t te_short = (uint32_t)subghz_protocol_fiat_v0_const.te_short;
     uint32_t te_long = (uint32_t)subghz_protocol_fiat_v0_const.te_long;
     uint32_t te_delta = (uint32_t)subghz_protocol_fiat_v0_const.te_delta;
-    uint32_t gap_threshold = 800;
+    uint32_t gap_threshold = FIAT_V0_GAP_US;
     uint32_t diff;
 
     switch(instance->decoder_state) {
@@ -401,6 +407,8 @@ void subghz_protocol_decoder_fiat_v0_feed(void* context, bool level, uint32_t du
             instance->te_last = duration;
             instance->preamble_count = 0;
             instance->bit_count = 0;
+            /* Ensure a known Manchester phase before the first data edge */
+            instance->manchester_state = ManchesterStateMid1;
             manchester_advance(
                 instance->manchester_state,
                 ManchesterEventReset,
@@ -411,6 +419,10 @@ void subghz_protocol_decoder_fiat_v0_feed(void* context, bool level, uint32_t du
 
     case FiatV0DecoderStepPreamble:
         if(level) {
+            return;
+        }
+        /* Ignore very short glitches */
+        if(duration < (te_short - te_delta)) {
             return;
         }
         if(duration < te_short) {
@@ -431,6 +443,13 @@ void subghz_protocol_decoder_fiat_v0_feed(void* context, bool level, uint32_t du
                         instance->data_high = 0;
                         instance->bit_count = 0;
                         instance->te_last = duration;
+                        /* Reset Manchester state at frame start after preamble gap */
+                        instance->manchester_state = ManchesterStateMid1;
+                        manchester_advance(
+                            instance->manchester_state,
+                            ManchesterEventReset,
+                            &instance->manchester_state,
+                            NULL);
                         return;
                     }
                 }
@@ -449,6 +468,13 @@ void subghz_protocol_decoder_fiat_v0_feed(void* context, bool level, uint32_t du
                         instance->data_high = 0;
                         instance->bit_count = 0;
                         instance->te_last = duration;
+                        /* Reset Manchester state at frame start after preamble gap */
+                        instance->manchester_state = ManchesterStateMid1;
+                        manchester_advance(
+                            instance->manchester_state,
+                            ManchesterEventReset,
+                            &instance->manchester_state,
+                            NULL);
                         return;
                     }
                 }
@@ -474,6 +500,13 @@ void subghz_protocol_decoder_fiat_v0_feed(void* context, bool level, uint32_t du
                     instance->data_high = 0;
                     instance->bit_count = 0;
                     instance->te_last = duration;
+                    /* Reset Manchester state at frame start after preamble gap */
+                    instance->manchester_state = ManchesterStateMid1;
+                    manchester_advance(
+                        instance->manchester_state,
+                        ManchesterEventReset,
+                        &instance->manchester_state,
+                        NULL);
                     return;
                 }
             }
@@ -482,15 +515,19 @@ void subghz_protocol_decoder_fiat_v0_feed(void* context, bool level, uint32_t du
 
     case FiatV0DecoderStepData: {
         ManchesterEvent event = ManchesterEventReset;
+        /* Ignore very short glitches */
+        if(duration < (te_short - te_delta)) {
+            break;
+        }
         if(duration < te_short) {
             diff = te_short - duration;
             if(diff < te_delta) {
-                event = level ? ManchesterEventShortLow : ManchesterEventShortHigh;
+                event = level ? ManchesterEventShortHigh : ManchesterEventShortLow;
             }
         } else {
             diff = duration - te_short;
             if(diff < te_delta) {
-                event = level ? ManchesterEventShortLow : ManchesterEventShortHigh;
+                event = level ? ManchesterEventShortHigh : ManchesterEventShortLow;
             } else {
                 if(duration < te_long) {
                     diff = te_long - duration;
@@ -498,11 +535,22 @@ void subghz_protocol_decoder_fiat_v0_feed(void* context, bool level, uint32_t du
                     diff = duration - te_long;
                 }
                 if(diff < te_delta) {
-                    event = level ? ManchesterEventLongLow : ManchesterEventLongHigh;
+                    event = level ? ManchesterEventLongHigh : ManchesterEventLongLow;
                 }
             }
         }
-
+        if(event == ManchesterEventReset) {
+            /* Bad edge timing or a gap: reset frame decode state */
+            if(duration > (FIAT_V0_INTER_BURST_GAP / 2)) {
+                instance->decoder_state = FiatV0DecoderStepReset;
+                instance->preamble_count = 0;
+                instance->data_low = 0;
+                instance->data_high = 0;
+                instance->bit_count = 0;
+                instance->manchester_state = ManchesterStateMid1;
+            }
+            break;
+        }
         if(event != ManchesterEventReset) {
             bool data_bit_bool;
             if(manchester_advance(
@@ -525,7 +573,7 @@ void subghz_protocol_decoder_fiat_v0_feed(void* context, bool level, uint32_t du
                     instance->data_high = 0;
                 }
 
-                if(instance->bit_count > 0x46) {
+                if(instance->bit_count >= 0x46) {
                     instance->btn = (uint8_t)((instance->data_low << 1) | 1);
 
                     instance->generic.data = ((uint64_t)instance->cnt << 32) | instance->serial;
