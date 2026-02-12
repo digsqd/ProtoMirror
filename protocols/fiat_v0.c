@@ -2,7 +2,7 @@
 #include "../protopirate_app_i.h"
 #include <lib/toolbox/manchester_decoder.h>
 
-#define TAG "FiatProtocolV0"
+#define TAG                   "FiatProtocolV0"
 #define FIAT_PROTOCOL_V0_NAME "Fiat V0"
 
 static const SubGhzBlockConst subghz_protocol_fiat_v0_const = {
