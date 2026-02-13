@@ -57,8 +57,6 @@ void protopirate_scene_receiver_info_on_enter(void* context) {
             }
             if(furi_string_cmp_str(protocol, "Scher-Khan") == 0) {
                 is_emu_off = true;
-            } else if(furi_string_cmp_str(protocol, "Kia V5") == 0) {
-                is_emu_off = true;
             } else if(furi_string_cmp_str(protocol, "Kia V6") == 0) {
                 is_emu_off = true;
             } else {

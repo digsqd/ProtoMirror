@@ -20,18 +20,18 @@ App is intended for educational and security purposes only, and has no signal tr
 
 ## **Supported Protocols**
 
-| Protocol                      | Decoder | Encoder |
-|:------------------------------|:--------|:--------|
-| Fiat V0                       | ✅ | ✅ |
-| Ford V0                       | ✅ | ✅ |
-| Kia V0 / V1 / V2 / V3 / V4    | ✅ | ✅ |
-| Kia V5 / V6                   | ✅ | ❌ |
-| Scher-Khan                    | ✅ | ❌ |
-| StarLine                      | ✅ | ✅ |
-| Subaru                        | ✅ | ✅ |
-| Suzuki                        | ✅ | ✅ |
-| PSA                           | ✅ | ✅ |
-| VAG (VW)                      | ✅ | ✅ |
+| Protocol                        | Decoder | Encoder |
+|:--------------------------------|:--------|:--------|
+| Fiat V0                         | ✅ | ✅ |
+| Ford V0                         | ✅ | ✅ |
+| Kia V0 / V1 / V2 / V3 / V4 / V5 | ✅ | ✅ |
+| Kia V6                          | ✅ | ❌ |
+| Scher-Khan                      | ✅ | ❌ |
+| StarLine                        | ✅ | ✅ |
+| Subaru                          | ✅ | ✅ |
+| Suzuki                          | ✅ | ✅ |
+| PSA                             | ✅ | ✅ |
+| VAG (VW)                        | ✅ | ✅ |
 
 _More Coming Soon_
 
