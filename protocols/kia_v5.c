@@ -53,6 +53,7 @@ static uint64_t bit_reverse_64(uint64_t input) {
 // CRC CALCULATION
 // =============================================================================
 
+#ifdef ENABLE_EMULATE_FEATURE
 static uint8_t kia_v5_calculate_crc(uint64_t yek) {
     uint8_t crc = 0;
     for(int i = 0; i < 16; i++) {
@@ -60,6 +61,7 @@ static uint8_t kia_v5_calculate_crc(uint64_t yek) {
     }
     return crc & 0x07;
 }
+#endif
 
 // =============================================================================
 // DECRYPTION
@@ -277,11 +279,8 @@ const SubGhzProtocol kia_protocol_v5 = {
 #define KIA_V5_TOTAL_BURSTS       3
 #define KIA_V5_INTER_BURST_GAP_US 10000
 
-<<<<<<< Updated upstream
 // Static state — persists across encoder alloc/free cycles
 // for the lifetime of the app session
-=======
->>>>>>> Stashed changes
 static uint16_t kia_v5_last_counter = 0;
 static bool kia_v5_counter_loaded = false;
 static bool kia_v5_tx_done = false;
@@ -419,6 +418,7 @@ static void kia_protocol_encoder_v5_get_upload(SubGhzProtocolEncoderKiaV5* insta
             prev_bit = curr_bit;
         }
 
+        // Termination: create a level transition after the last data bit
         KV5_ADD(prev_bit, te_short);
     }
 
@@ -445,10 +445,7 @@ SubGhzProtocolStatus
     instance->encoder.repeat = 1;
 
     do {
-<<<<<<< Updated upstream
-        // Maybe loop happening here?
-=======
->>>>>>> Stashed changes
+        // Maybe loop is from here idk
         if(kia_v5_tx_done) {
             KV5_LOG("TX already completed, blocking re-deserialize");
             break;
@@ -525,10 +522,7 @@ SubGhzProtocolStatus
 
         KV5_LOG("Parsed key: %08lX%08lX", (uint32_t)(key >> 32), (uint32_t)(key & 0xFFFFFFFF));
 
-<<<<<<< Updated upstream
-=======
         // Read serial (always from file — serial doesn't change)
->>>>>>> Stashed changes
         if(!flipper_format_read_uint32(flipper_format, "Serial", &instance->serial, 1)) {
             uint64_t yek = bit_reverse_64(key);
             instance->serial = (uint32_t)((yek >> 32) & 0x0FFFFFFF);
@@ -538,10 +532,7 @@ SubGhzProtocolStatus
         }
         instance->generic.serial = instance->serial;
 
-<<<<<<< Updated upstream
-=======
         // Read button (always from file — button doesn't change)
->>>>>>> Stashed changes
         uint32_t btn_temp;
         if(flipper_format_read_uint32(flipper_format, "Btn", &btn_temp, 1)) {
             instance->button = (uint8_t)btn_temp;
@@ -553,6 +544,8 @@ SubGhzProtocolStatus
         }
         instance->generic.btn = instance->button;
 
+        // Read counter: use static state to persist across encoder
+        // alloc/free cycles within the same app session.
         if(!kia_v5_counter_loaded) {
             uint32_t cnt_temp;
             if(flipper_format_read_uint32(flipper_format, "Cnt", &cnt_temp, 1)) {
