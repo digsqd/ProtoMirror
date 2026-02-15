@@ -198,6 +198,11 @@ struct SubGhzProtocolDecoderKiaV5 {
     uint8_t bit_count;
     uint64_t yek;
     uint8_t crc;
+
+    // Rolling code duplicate rejection (per session)
+    uint32_t last_serial;
+    uint32_t last_cnt;
+    bool has_last;
 };
 
 #ifdef ENABLE_EMULATE_FEATURE
@@ -678,6 +683,9 @@ void kia_protocol_decoder_v5_reset(void* context) {
     instance->yek = 0;
     instance->crc = 0;
     instance->manchester_state = ManchesterStateMid1;
+    instance->last_serial = 0;
+    instance->last_cnt = 0;
+    instance->has_last = false;
 }
 
 void kia_protocol_decoder_v5_feed(void* context, bool level, uint32_t duration) {
@@ -763,6 +771,20 @@ void kia_protocol_decoder_v5_feed(void* context, bool level, uint32_t duration) 
                     instance->generic.btn,
                     instance->generic.cnt,
                     instance->crc);
+
+                // Rolling code duplicate rejection: same serial + same counter = duplicate burst
+                if(instance->has_last &&
+                   instance->generic.serial == instance->last_serial &&
+                   instance->generic.cnt == instance->last_cnt) {
+                    KV5_LOG("RX: Duplicate suppressed (Sn=%07lX Cnt=%04lX)",
+                        instance->generic.serial, instance->generic.cnt);
+                    instance->decoder.parser_step = KiaV5DecoderStepReset;
+                    break;
+                }
+
+                instance->last_serial = instance->generic.serial;
+                instance->last_cnt = instance->generic.cnt;
+                instance->has_last = true;
 
                 if(instance->base.callback)
                     instance->base.callback(&instance->base, instance->base.context);

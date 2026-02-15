@@ -29,9 +29,11 @@ SubGhzProtocolStatus
 void kia_protocol_decoder_v5_get_string(void* context, FuriString* output);
 
 // Encoder functions
+#ifdef ENABLE_EMULATE_FEATURE
 void* kia_protocol_encoder_v5_alloc(SubGhzEnvironment* environment);
 void kia_protocol_encoder_v5_free(void* context);
 SubGhzProtocolStatus
     kia_protocol_encoder_v5_deserialize(void* context, FlipperFormat* flipper_format);
 void kia_protocol_encoder_v5_stop(void* context);
 LevelDuration kia_protocol_encoder_v5_yield(void* context);
+#endif
