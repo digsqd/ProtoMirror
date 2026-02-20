@@ -6,17 +6,8 @@
 #define TAG "VAGProtocol"
 
 #define VAG_ENCODER_UPLOAD_MAX_SIZE 680
-#define VAG_KEYS_COUNT              3
 // uncomment to enable
 //#define VAG_CHECK_UPLOAD_OVERFLOW
-
-/* Timing helpers: keep decoder/encoder checks compact and consistent */
-static inline uint32_t vag_udiff_u32(uint32_t a, uint32_t b) {
-    return (a > b) ? (a - b) : (b - a);
-}
-#define VAG_NEAR(d, t, tol) (vag_udiff_u32((d), (t)) <= (uint32_t)(tol))
-#define VAG_TOL_300         79u
-#define VAG_TOL_500         120u
 
 /* Manchester emit helper: one bit -> two half-bits */
 #define VAG_EMIT_MANCHESTER(u, idx, bit, te)                 \
