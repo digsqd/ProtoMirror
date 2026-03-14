@@ -119,8 +119,6 @@ void protopirate_scene_saved_info_on_enter(void* context) {
         is_emu_off = true;
     } else if(furi_string_cmp_str(temp_str, "Kia V5") == 0) {
         is_emu_off = true;
-    } else if(furi_string_cmp_str(temp_str, "Kia V6") == 0) {
-        is_emu_off = true;
     }
 
     flipper_format_rewind(ff);
